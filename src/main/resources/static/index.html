@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Manager</title>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --danger: #dc2626;
+    --danger-dark: #b91c1c;
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 2rem 1rem;
+  }
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  h1 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .form-row {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .form-row .field {
+    flex: 1 1 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  label {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  input {
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95rem;
+  }
+  input:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: -1px;
+  }
+  .actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+  }
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+    padding: 0.55rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-secondary {
+    background: #e2e8f0;
+    color: var(--text);
+  }
+  .btn-secondary:hover { background: #cbd5e1; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  th { color: var(--muted); font-weight: 600; }
+  .row-actions button {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    margin-right: 0.35rem;
+  }
+  .btn-edit { background: #fef3c7; color: #92400e; }
+  .btn-edit:hover { background: #fde68a; }
+  .btn-delete { background: #fee2e2; color: var(--danger-dark); }
+  .btn-delete:hover { background: #fecaca; }
+  #message {
+    min-height: 1.2rem;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+  }
+  #message.error { color: var(--danger); }
+  #message.success { color: #16a34a; }
+  .empty {
+    color: var(--muted);
+    text-align: center;
+    padding: 1rem 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Student Manager</h1>
+
+  <div class="card">
+    <form id="student-form">
+      <input type="hidden" id="student-id" value="">
+      <div class="form-row">
+        <div class="field">
+          <label for="name">Name</label>
+          <input type="text" id="name" required>
+        </div>
+        <div class="field">
+          <label for="age">Age</label>
+          <input type="number" id="age" min="0" required>
+        </div>
+        <div class="field">
+          <label for="studentClass">Class</label>
+          <input type="text" id="studentClass" required>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn-primary" id="submit-btn">Add Student</button>
+        <button type="button" class="btn-secondary" id="cancel-btn" style="display:none;">Cancel</button>
+      </div>
+      <div id="message"></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Age</th>
+          <th>Class</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="student-list"></tbody>
+    </table>
+    <div id="empty-state" class="empty" style="display:none;">No students yet. Add one above.</div>
+  </div>
+</div>
+
+<script>
+const API_URL = '/api/students';
+
+const form = document.getElementById('student-form');
+const idField = document.getElementById('student-id');
+const nameField = document.getElementById('name');
+const ageField = document.getElementById('age');
+const classField = document.getElementById('studentClass');
+const submitBtn = document.getElementById('submit-btn');
+const cancelBtn = document.getElementById('cancel-btn');
+const messageEl = document.getElementById('message');
+const listBody = document.getElementById('student-list');
+const emptyState = document.getElementById('empty-state');
+
+function showMessage(text, type) {
+  messageEl.textContent = text;
+  messageEl.className = type || '';
+  if (text) {
+    setTimeout(() => {
+      messageEl.textContent = '';
+      messageEl.className = '';
+    }, 3000);
+  }
+}
+
+function resetForm() {
+  idField.value = '';
+  form.reset();
+  submitBtn.textContent = 'Add Student';
+  cancelBtn.style.display = 'none';
+}
+
+async function fetchStudents() {
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error('Failed to load students');
+    const students = await res.json();
+    renderStudents(students);
+  } catch (err) {
+    showMessage(err.message, 'error');
+  }
+}
+
+function renderStudents(students) {
+  listBody.innerHTML = '';
+  if (!students.length) {
+    emptyState.style.display = 'block';
+    return;
+  }
+  emptyState.style.display = 'none';
+  students.forEach(s => {
+    const tr = document.createElement('tr');
+
+    const nameTd = document.createElement('td');
+    nameTd.textContent = s.name;
+
+    const ageTd = document.createElement('td');
+    ageTd.textContent = s.age;
+
+    const classTd = document.createElement('td');
+    classTd.textContent = s.studentClass;
+
+    const actionsTd = document.createElement('td');
+    actionsTd.className = 'row-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.textContent = 'Edit';
+    editBtn.className = 'btn-edit';
+    editBtn.type = 'button';
+    editBtn.addEventListener('click', () => startEdit(s));
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'btn-delete';
+    deleteBtn.type = 'button';
+    deleteBtn.addEventListener('click', () => deleteStudent(s.id));
+
+    actionsTd.appendChild(editBtn);
+    actionsTd.appendChild(deleteBtn);
+
+    tr.appendChild(nameTd);
+    tr.appendChild(ageTd);
+    tr.appendChild(classTd);
+    tr.appendChild(actionsTd);
+
+    listBody.appendChild(tr);
+  });
+}
+
+function startEdit(student) {
+  idField.value = student.id;
+  nameField.value = student.name;
+  ageField.value = student.age;
+  classField.value = student.studentClass;
+  submitBtn.textContent = 'Update Student';
+  cancelBtn.style.display = 'inline-block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteStudent(id) {
+  if (!confirm('Delete this student?')) return;
+  try {
+    const res = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete student');
+    showMessage('Student deleted', 'success');
+    fetchStudents();
+  } catch (err) {
+    showMessage(err.message, 'error');
+  }
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const payload = {
+    name: nameField.value.trim(),
+    age: parseInt(ageField.value, 10),
+    studentClass: classField.value.trim()
+  };
+
+  const id = idField.value;
+  const isUpdate = !!id;
+  const url = isUpdate ? `${API_URL}/${id}` : API_URL;
+  const method = isUpdate ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(isUpdate ? 'Failed to update student' : 'Failed to create student');
+    showMessage(isUpdate ? 'Student updated' : 'Student added', 'success');
+    resetForm();
+    fetchStudents();
+  } catch (err) {
+    showMessage(err.message, 'error');
+  }
+});
+
+cancelBtn.addEventListener('click', resetForm);
+
+fetchStudents();
+</script>
+</body>
+</html>
